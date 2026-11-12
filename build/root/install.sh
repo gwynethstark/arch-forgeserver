@@ -130,29 +130,31 @@ rm /tmp/permissions_heredoc
 
 cat <<'EOF' > /tmp/envvars_heredoc
 
-export CREATE_BACKUP_HOURS=$(echo "${CREATE_BACKUP_HOURS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${CREATE_BACKUP_HOURS}" ]]; then
-	echo "[info] CREATE_BACKUP_HOURS defined as '${CREATE_BACKUP_HOURS}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] CREATE_BACKUP_HOURS not defined,(via -e CREATE_BACKUP_HOURS), defaulting to '12'" | ts '%Y-%m-%d %H:%M:%.S'
-	export CREATE_BACKUP_HOURS="12"
-fi
+# source in utility functions, need process_env_var
+source utils.sh
 
-export PURGE_BACKUP_DAYS=$(echo "${PURGE_BACKUP_DAYS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${PURGE_BACKUP_DAYS}" ]]; then
-	echo "[info] PURGE_BACKUP_DAYS defined as '${PURGE_BACKUP_DAYS}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] PURGE_BACKUP_DAYS not defined,(via -e PURGE_BACKUP_DAYS), defaulting to '14'" | ts '%Y-%m-%d %H:%M:%.S'
-	export PURGE_BACKUP_DAYS="14"
-fi
+# Define environment variables to process
+# Format: "VAR_NAME:DEFAULT_VALUE:REQUIRED:MASK"
+env_vars=(
+	"CREATE_BACKUP_HOURS:12:false:false"
+	"PURGE_BACKUP_DAYS:14:false:false"
+	"ENABLE_WEBUI_CONSOLE:yes:false:false"
+	"CUSTOM_JAR_PATH:/config/minecraft/minecraft_server.jar:false:false"
+	"JAVA_VERSION:latest:false:false"
+	"JAVA_INITIAL_HEAP_SIZE:512M:false:false"
+	"JAVA_MAX_HEAP_SIZE:1024M:false:false"
+	"JAVA_MAX_THREADS:1:false:false"
+	"JAVA_CUSTOM_ARGS::false:false"
+	"STARTUP_CMD::false:false"
+	"ENABLE_STARTUP_SCRIPTS:no:false:false"
+	"STARTUP_SCRIPTS_MODE:wait:false:false"
+)
 
-export ENABLE_WEBUI_CONSOLE=$(echo "${ENABLE_WEBUI_CONSOLE}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${ENABLE_WEBUI_CONSOLE}" ]]; then
-	echo "[info] ENABLE_WEBUI_CONSOLE defined as '${ENABLE_WEBUI_CONSOLE}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] ENABLE_WEBUI_CONSOLE not defined,(via -e ENABLE_WEBUI_CONSOLE), defaulting to 'yes'" | ts '%Y-%m-%d %H:%M:%.S'
-	export ENABLE_WEBUI_CONSOLE="yes"
-fi
+# Process each environment variable
+for env_var in "${env_vars[@]}"; do
+	IFS=':' read -r var_name default_value required mask_value <<< "${env_var}"
+	process_env_var "${var_name}" "${default_value}" "${required}" "${mask_value}"
+done
 
 if [[ "${ENABLE_WEBUI_CONSOLE}" == "yes" ]]; then
 	export ENABLE_WEBUI_AUTH=$(echo "${ENABLE_WEBUI_AUTH}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
@@ -201,24 +203,8 @@ if [[ "${ENABLE_WEBUI_CONSOLE}" == "yes" ]]; then
 	fi
 fi
 
-export CUSTOM_JAR_PATH=$(echo "${CUSTOM_JAR_PATH}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${CUSTOM_JAR_PATH}" ]]; then
-	echo "[info] CUSTOM_JAR_PATH defined as '${CUSTOM_JAR_PATH}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] CUSTOM_JAR_PATH not defined,(via -e CUSTOM_JAR_PATH), defaulting to '/config/minecraft/minecraft_server.jar' (Mojang Minecraft Java)" | ts '%Y-%m-%d %H:%M:%.S'
-	export CUSTOM_JAR_PATH="/config/minecraft/minecraft_server.jar"
-fi
-
 # get latest java version for package 'jre-openjdk-headless'
 latest_java_version=$(pacman -Qi jre-openjdk-headless | grep -P -o -m 1 '^Version\s*: \K.+' | grep -P -o -m 1 '^[0-9]+')
-
-export JAVA_VERSION=$(echo "${JAVA_VERSION}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${JAVA_VERSION}" ]]; then
-	echo "[info] JAVA_VERSION defined as '${JAVA_VERSION}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] JAVA_VERSION not defined,(via -e JAVA_VERSION), defaulting to Java version 'latest'" | ts '%Y-%m-%d %H:%M:%.S'
-	export JAVA_VERSION="latest"
-fi
 
 if [[ "${JAVA_VERSION}" == "8" ]]; then
 	ln -fs '/usr/lib/jvm/java-8-openjdk/jre/bin/java' '/usr/bin/java'
@@ -240,45 +226,6 @@ else
 	ln -fs "/usr/lib/jvm/java-${latest_java_version}-openjdk/bin/java" '/usr/bin/java'
 	archlinux-java set java-${latest_java_version}-openjdk
 fi
-
-export JAVA_INITIAL_HEAP_SIZE=$(echo "${JAVA_INITIAL_HEAP_SIZE}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${JAVA_INITIAL_HEAP_SIZE}" ]]; then
-	echo "[info] JAVA_INITIAL_HEAP_SIZE defined as '${JAVA_INITIAL_HEAP_SIZE}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] JAVA_INITIAL_HEAP_SIZE not defined,(via -e JAVA_INITIAL_HEAP_SIZE), defaulting to '512M'" | ts '%Y-%m-%d %H:%M:%.S'
-	export JAVA_INITIAL_HEAP_SIZE="512M"
-fi
-
-export JAVA_MAX_HEAP_SIZE=$(echo "${JAVA_MAX_HEAP_SIZE}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${JAVA_MAX_HEAP_SIZE}" ]]; then
-	echo "[info] JAVA_MAX_HEAP_SIZE defined as '${JAVA_MAX_HEAP_SIZE}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] JAVA_MAX_HEAP_SIZE not defined,(via -e JAVA_MAX_HEAP_SIZE), defaulting to '1024M'" | ts '%Y-%m-%d %H:%M:%.S'
-	export JAVA_MAX_HEAP_SIZE="1024M"
-fi
-
-export JAVA_MAX_THREADS=$(echo "${JAVA_MAX_THREADS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${JAVA_MAX_THREADS}" ]]; then
-	echo "[info] JAVA_MAX_THREADS defined as '${JAVA_MAX_THREADS}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] JAVA_MAX_THREADS not defined,(via -e JAVA_MAX_THREADS), defaulting to '1'" | ts '%Y-%m-%d %H:%M:%.S'
-	export JAVA_MAX_THREADS="1"
-fi
-
-export JAVA_CUSTOM_ARGS=$(echo "${JAVA_CUSTOM_ARGS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${JAVA_CUSTOM_ARGS}" ]]; then
-	echo "[info] JAVA_CUSTOM_ARGS defined as '${JAVA_CUSTOM_ARGS}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] JAVA_CUSTOM_ARGS not defined,(via -e JAVA_CUSTOM_ARGS)" | ts '%Y-%m-%d %H:%M:%.S'
-fi
-
-export STARTUP_CMD=$(echo "${STARTUP_CMD}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${STARTUP_CMD}" ]]; then
-	echo "[info] STARTUP_CMD defined as '${STARTUP_CMD}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[info] STARTUP_CMD not defined (via -e STARTUP_CMD)" | ts '%Y-%m-%d %H:%M:%.S'
-fi
-
 EOF
 
 # replace env vars placeholder string with contents of file (here doc)
